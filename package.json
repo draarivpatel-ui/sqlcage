@@ -1,0 +1,66 @@
+{
+  "name": "sqlcage",
+  "version": "1.0.0",
+  "description": "Zero-dependency SQL injection defenses: tagged-template parameterized queries, strict identifier allowlists, safe SQL helpers, and a static SQL risk auditor",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/draarivpatel-ui/sqlcage.git"
+  },
+  "homepage": "https://github.com/draarivpatel-ui/sqlcage#readme",
+  "bugs": {
+    "url": "https://github.com/draarivpatel-ui/sqlcage/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./src/index.mjs",
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "sqlcage": "bin/sqlcage.mjs"
+  },
+  "files": [
+    "src",
+    "dist",
+    "types",
+    "bin",
+    "docs",
+    "README.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build:cjs": "node scripts/build-cjs.mjs",
+    "check:cjs": "node scripts/build-cjs.mjs --check",
+    "smoke": "node scripts/smoke.mjs",
+    "test": "node scripts/run-tests.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "security",
+    "sql-injection",
+    "sqli",
+    "sql",
+    "postgres",
+    "postgresql",
+    "mysql",
+    "sqlite",
+    "parameterized-queries",
+    "query-builder",
+    "cwe-89",
+    "zero-dependency"
+  ],
+  "license": "MIT",
+  "sideEffects": false,
+  "dependencies": {},
+  "devDependencies": {}
+}

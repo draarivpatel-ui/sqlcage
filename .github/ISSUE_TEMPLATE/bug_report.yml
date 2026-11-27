@@ -1,0 +1,41 @@
+name: Bug report
+description: Report incorrect sqlcage behavior without disclosing a vulnerability
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include a working exploit or unpatched security bypass. Use private security reporting for vulnerabilities.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Which sqlcage version or repository commit did you test?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include the smallest JavaScript or CLI reproduction that shows the incorrect behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should sqlcage have done instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: dialect
+    attributes:
+      label: Dialect
+      options:
+        - postgres
+        - mysql
+        - sqlite
+        - dialect independent
+    validations:
+      required: true

@@ -1,0 +1,24 @@
+name: Feature request
+description: Request a non-sensitive sqlcage improvement
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Which SQL injection defense problem or developer ergonomics problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the API or behavior change and how it fails closed.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: What existing sqlcage API or external approach did you consider?
