@@ -1,5 +1,7 @@
 # sqlcage
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/draarivpatel-ui/sqlcage/badge)](https://scorecard.dev/viewer/?uri=github.com/draarivpatel-ui/sqlcage)
+
 sqlcage is a zero-dependency Node.js library for reducing CWE-89 SQL injection risk in applications that build SQL dynamically. It combines a strict tagged-template parameterized query builder, schema-driven identifier allowlists, safe helpers for dynamic SQL shapes, and a lightweight static SQL risk auditor.
 
 The package supports PostgreSQL, MySQL, and SQLite parameter conventions, ships ESM, CommonJS, and TypeScript declarations, and runs on Node.js 18 and later.
