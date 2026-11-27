@@ -238,6 +238,13 @@ test('CLI neutralizes ANSI control characters in usage errors', () => {
   assert.match(result.stderr, /\?\[31m/);
 });
 
+test('CLI neutralizes Unicode bidi controls in usage errors', () => {
+  const result = runCli(['audit', '-', '--bad-\u202e-option'], { input: 'SELECT 1' });
+  assert.equal(result.status, 2);
+  assert.equal(result.stderr.includes('\u202e'), false);
+  assert.match(result.stderr, /--bad-\?-option/);
+});
+
 test('CLI neutralizes control characters in file open errors', (t) => {
   if (process.platform === 'win32') {
     t.skip('control characters in filenames are not portable on Windows');

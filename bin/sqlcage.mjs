@@ -23,7 +23,7 @@ function usageText() {
 }
 
 function neutralizeTerminalText(value) {
-  return String(value).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, '?');
+  return String(value).replace(/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, '?');
 }
 
 function usageError(message) {
@@ -101,6 +101,18 @@ function readFully(fd, maximumBytes, sourceName) {
 function readAuditInput(file) {
   if (file === '-') {
     return readFully(0, MAX_FILE_BYTES, 'standard input');
+  }
+  let initialStat;
+  try {
+    initialStat = fs.lstatSync(file);
+  } catch (error) {
+    throw new Error('cannot open audit input: ' + neutralizeTerminalText(error.message));
+  }
+  if (initialStat.isSymbolicLink()) {
+    throw new Error('audit input must be a regular file, not a symbolic link');
+  }
+  if (!initialStat.isFile()) {
+    throw new Error('audit input must be a regular file, not a directory, FIFO, device, or socket');
   }
   const noFollow = fs.constants.O_NOFOLLOW === undefined ? 0 : fs.constants.O_NOFOLLOW;
   const nonBlocking = fs.constants.O_NONBLOCK === undefined ? 0 : fs.constants.O_NONBLOCK;

@@ -166,9 +166,9 @@ test('sqlLike custom escape character appears literally once in postgres output'
   assert.deepEqual(result.values, ['%a!%b%']);
 });
 
-test('sqlLike mysql output doubles a backslash escape literal', () => {
+test('sqlLike mysql output uses a mode-independent escape literal', () => {
   const result = compileQuery(sql`${sqlLike('name', 'x', { dialect: 'mysql' })}`, { dialect: 'mysql' });
-  assert.equal(result.sql.includes("ESCAPE '\\\\'"), true);
+  assert.equal(result.sql.includes("ESCAPE '!'"), true);
 });
 
 test('safeOrderBy nulls string syntax is parsed explicitly', () => {

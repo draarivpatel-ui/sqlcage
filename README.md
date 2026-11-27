@@ -135,7 +135,7 @@ sql('SELECT * FROM users WHERE id = ' + userId);
 // SqlCageError with SQLCAGE_NOT_TAGGED_TEMPLATE
 ```
 
-The tagged-template check verifies the frozen template arrays created by JavaScript. It is intentionally strict because a plain function call means string concatenation may already have happened.
+The tagged-template check verifies the observable frozen template-array shape created by JavaScript. It is intentionally strict because a plain function call means string concatenation may already have happened. JavaScript cannot prove the difference between a real template object and a perfectly hand-frozen counterfeit, so applications must use `sql` only as a tag and must never pass attacker-controlled objects to it as an ordinary function argument.
 
 Nested fragments compose without string concatenation:
 
@@ -290,11 +290,11 @@ PostgreSQL output has this shape:
 "display_name" LIKE $1 ESCAPE '\'
 ```
 
-Supported modes are `contains`, `startsWith`, and `endsWith`. Wildcards added by the selected mode are intentional. Wildcards inside the user-controlled value are escaped. For MySQL, a backslash escape character is emitted as a doubled backslash in the static `ESCAPE` literal so MySQL string unescaping still yields one escape character.
+Supported modes are `contains`, `startsWith`, and `endsWith`. Wildcards added by the selected mode are intentional. Wildcards inside the user-controlled value are escaped. For MySQL, `sqlLike` uses `!` as its default escape character and rejects an explicit backslash escape character. This avoids the behavior differences created by MySQL `NO_BACKSLASH_ESCAPES` mode.
 
 ## Static SQL auditing
 
-`auditSqlQuery` lexically scans SQL while respecting quoted strings, quoted identifiers, comments, and PostgreSQL dollar-quoted strings. It reports stable finding codes for:
+`auditSqlQuery` lexically scans SQL while respecting quoted strings, quoted identifiers, dialect-aware comments, PostgreSQL dollar-quoted strings, and PostgreSQL escape strings. MySQL executable comments such as `/*!50000 ... */` are scanned as live SQL because MySQL executes their contents. It reports stable finding codes for:
 
 - executable content after a statement terminator, including forms such as `; SELECT ...`
 - comment markers outside literals, including `--`, `/*`, and `#`
@@ -329,7 +329,7 @@ Exit codes:
 - `1` means one or more audit findings.
 - `2` means usage, input, or file-safety failure.
 
-Files are opened read-only with no-follow behavior where the platform supports it, checked with `fstat`, and rejected unless they are regular files. Directories, FIFOs, devices, sockets, symbolic links, and files over one MiB are rejected. Error output is neutralized so terminal control sequences in paths or arguments cannot execute terminal escapes.
+Files are checked with `lstat`, opened read-only with no-follow and non-blocking behavior where the platform supports them, verified again with `fstat`, and rejected unless they are regular files. Directories, FIFOs, devices, sockets, symbolic links, and files over one MiB are rejected. Error output is neutralized so terminal control sequences and Unicode bidirectional override characters in paths or arguments cannot manipulate terminal output.
 
 ## Compile-time limits
 

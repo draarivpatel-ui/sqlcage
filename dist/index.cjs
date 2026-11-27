@@ -88,6 +88,31 @@ function isPlainObject(value) {
   return prototype === Object.prototype || prototype === null;
 }
 
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function ownOption(object, key) {
+  return hasOwn(object, key) ? object[key] : undefined;
+}
+
+function assertDenseArray(array, name, code) {
+  for (let index = 0; index < array.length; index += 1) {
+    if (!hasOwn(array, index)) {
+      fail(code, name + ' must not contain sparse holes');
+    }
+  }
+  return array;
+}
+
+function assertNoInheritedEnumerableKeys(object, name, code) {
+  for (const key in object) {
+    if (!hasOwn(object, key)) {
+      fail(code, name + ' must not inherit enumerable keys');
+    }
+  }
+}
+
 function assertPlainObject(value, name) {
   if (!isPlainObject(value)) {
     fail(CODE.INVALID_OPTIONS, name + ' must be a plain object');
@@ -104,13 +129,14 @@ function normalizeDialect(dialect) {
 
 function normalizeDialectArgument(dialectOrOptions) {
   if (isPlainObject(dialectOrOptions)) {
-    return normalizeDialect(dialectOrOptions.dialect);
+    return normalizeDialect(ownOption(dialectOrOptions, 'dialect'));
   }
   return normalizeDialect(dialectOrOptions);
 }
 
 function positiveIntegerOption(options, key, fallback, maximum) {
-  const value = options[key] === undefined ? fallback : options[key];
+  const configured = ownOption(options, key);
+  const value = configured === undefined ? fallback : configured;
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1 || value > maximum) {
     fail(CODE.INVALID_OPTIONS, key + ' must be a safe positive integer no greater than ' + maximum);
   }
@@ -118,13 +144,16 @@ function positiveIntegerOption(options, key, fallback, maximum) {
 }
 
 function booleanOption(options, key) {
-  return options[key] === true;
+  return ownOption(options, key) === true;
 }
 
 function normalizeCompileOptions(options, base) {
   if (options === undefined || options === null) options = {};
   assertPlainObject(options, 'compile options');
-  const merged = base === undefined ? {} : { ...base };
+  const merged = Object.create(null);
+  if (base !== undefined) {
+    for (const key of Object.keys(base)) merged[key] = base[key];
+  }
   for (const key of Object.keys(options)) {
     if (options[key] !== undefined) merged[key] = options[key];
   }
@@ -371,8 +400,12 @@ function createSqlCage(options) {
       return quoteIdentifier(name, quoteOptions === undefined ? baseOptions.dialect : quoteOptions);
     },
     schema(schemaSpec, schemaOptions) {
-      const merged = schemaOptions === undefined ? { dialect: baseOptions.dialect } : { ...schemaOptions };
-      if (merged.dialect === undefined) merged.dialect = baseOptions.dialect;
+      const merged = Object.create(null);
+      if (schemaOptions !== undefined && schemaOptions !== null) {
+        assertPlainObject(schemaOptions, 'schema options');
+        for (const key of Object.keys(schemaOptions)) merged[key] = schemaOptions[key];
+      }
+      if (ownOption(merged, 'dialect') === undefined) merged.dialect = baseOptions.dialect;
       return createSchemaGuard(schemaSpec, merged);
     },
     options: baseOptions
@@ -414,6 +447,7 @@ function normalizeAllowedColumns(allowedColumns) {
   if (!Array.isArray(allowedColumns) && !(allowedColumns instanceof Set)) {
     fail(CODE.INVALID_SCHEMA, 'allowedColumns must be an array or Set of SQL identifiers');
   }
+  if (Array.isArray(allowedColumns)) assertDenseArray(allowedColumns, 'allowedColumns', CODE.INVALID_SCHEMA);
   const result = new Set();
   for (const column of allowedColumns) {
     assertIdentifier(column, 'allowed column');
@@ -426,6 +460,7 @@ function normalizeColumnList(columns, emptyCode) {
   if (!Array.isArray(columns)) {
     fail(emptyCode, 'columns must be an array of SQL identifiers');
   }
+  assertDenseArray(columns, 'columns', emptyCode);
   if (columns.length === 0) {
     fail(emptyCode, 'columns must not be empty');
   }
@@ -451,11 +486,12 @@ function optionalPositiveCap(value, maximum, name) {
 function safeColumns(columns, allowedColumns, options) {
   if (options === undefined || options === null) options = {};
   assertPlainObject(options, 'safeColumns options');
-  const dialect = normalizeDialect(options.dialect);
-  const table = options.table === undefined ? undefined : assertIdentifier(options.table, 'table');
+  const dialect = normalizeDialect(ownOption(options, 'dialect'));
+  const tableOption = ownOption(options, 'table');
+  const table = tableOption === undefined ? undefined : assertIdentifier(tableOption, 'table');
   const allowed = normalizeAllowedColumns(allowedColumns);
   const input = normalizeColumnList(columns, CODE.EMPTY_COLUMN_LIST);
-  const maxColumns = positiveCap(options.maxColumns, MAX_SCHEMA_COLUMNS, 1_024, 'maxColumns');
+  const maxColumns = positiveCap(ownOption(options, 'maxColumns'), MAX_SCHEMA_COLUMNS, 1_024, 'maxColumns');
   const seen = new Set();
   const output = [];
   for (const column of input) {
@@ -525,14 +561,15 @@ function normalizeOrderClauses(clauses) {
   if (!Array.isArray(clauses)) {
     fail(CODE.INVALID_ORDER_BY, 'ORDER BY clauses must be an array or a safe comma-separated string');
   }
+  assertDenseArray(clauses, 'ORDER BY clauses', CODE.INVALID_ORDER_BY);
   return clauses.map((clause) => {
     if (!isPlainObject(clause)) {
       fail(CODE.INVALID_ORDER_BY, 'each ORDER BY clause must be a plain object');
     }
     return {
-      column: clause.column,
-      direction: normalizeOrderDirection(clause.direction, false),
-      nulls: normalizeOrderNulls(clause.nulls, false)
+      column: ownOption(clause, 'column'),
+      direction: normalizeOrderDirection(ownOption(clause, 'direction'), false),
+      nulls: normalizeOrderNulls(ownOption(clause, 'nulls'), false)
     };
   });
 }
@@ -540,14 +577,15 @@ function normalizeOrderClauses(clauses) {
 function safeOrderBy(clauses, allowedColumns, options) {
   if (options === undefined || options === null) options = {};
   assertPlainObject(options, 'safeOrderBy options');
-  const dialect = normalizeDialect(options.dialect);
-  const table = options.table === undefined ? undefined : assertIdentifier(options.table, 'table');
+  const dialect = normalizeDialect(ownOption(options, 'dialect'));
+  const tableOption = ownOption(options, 'table');
+  const table = tableOption === undefined ? undefined : assertIdentifier(tableOption, 'table');
   const allowed = normalizeAllowedColumns(allowedColumns);
   const parsed = normalizeOrderClauses(clauses);
   if (parsed.length === 0) {
     fail(CODE.EMPTY_ORDER_BY, 'ORDER BY clauses must not be empty');
   }
-  const maxClauses = positiveCap(options.maxClauses, MAX_ORDER_CLAUSES, 64, 'maxClauses');
+  const maxClauses = positiveCap(ownOption(options, 'maxClauses'), MAX_ORDER_CLAUSES, 64, 'maxClauses');
   if (parsed.length > maxClauses) {
     fail(CODE.INVALID_ORDER_BY, 'ORDER BY clause count exceeds maxClauses (' + maxClauses + ')');
   }
@@ -576,18 +614,19 @@ function normalizeLimitOffset(input, options) {
   if (!isPlainObject(input)) {
     fail(CODE.INVALID_LIMIT_OFFSET, 'limitOffset input must be a plain object');
   }
-  const inputMaxLimit = Object.prototype.hasOwnProperty.call(input, 'maxLimit') ? input.maxLimit : undefined;
-  const inputLimit = Object.prototype.hasOwnProperty.call(input, 'limit') ? input.limit : undefined;
-  const inputOffset = Object.prototype.hasOwnProperty.call(input, 'offset') ? input.offset : undefined;
+  const inputMaxLimit = ownOption(input, 'maxLimit');
+  const inputLimit = ownOption(input, 'limit');
+  const inputOffset = ownOption(input, 'offset');
   let maxLimitCandidate = inputMaxLimit === undefined ? DEFAULT_MAX_LIMIT : inputMaxLimit;
   if (typeof maxLimitCandidate !== 'number' || !Number.isSafeInteger(maxLimitCandidate) || maxLimitCandidate < 1) {
     fail(CODE.INVALID_LIMIT_OFFSET, 'maxLimit must be a positive safe integer');
   }
-  if (options.maxLimit !== undefined) {
-    if (typeof options.maxLimit !== 'number' || !Number.isSafeInteger(options.maxLimit) || options.maxLimit < 1) {
+  const configuredMaxLimit = ownOption(options, 'maxLimit');
+  if (configuredMaxLimit !== undefined) {
+    if (typeof configuredMaxLimit !== 'number' || !Number.isSafeInteger(configuredMaxLimit) || configuredMaxLimit < 1) {
       fail(CODE.INVALID_LIMIT_OFFSET, 'configured maxLimit must be a positive safe integer');
     }
-    maxLimitCandidate = Math.min(maxLimitCandidate, options.maxLimit);
+    maxLimitCandidate = Math.min(maxLimitCandidate, configuredMaxLimit);
   }
   if (typeof inputLimit !== 'number' || !Number.isSafeInteger(inputLimit) || inputLimit < 1 || inputLimit > maxLimitCandidate) {
     fail(CODE.INVALID_LIMIT_OFFSET, 'limit must be an integer between 1 and maxLimit');
@@ -596,7 +635,7 @@ function normalizeLimitOffset(input, options) {
   if (typeof offset !== 'number' || !Number.isSafeInteger(offset) || offset < 0) {
     fail(CODE.INVALID_LIMIT_OFFSET, 'offset must be a non-negative safe integer');
   }
-  return Object.freeze({ limit: inputLimit, offset, maxLimit: maxLimitCandidate });
+  return Object.freeze({ limit: inputLimit, offset: Object.is(offset, -0) ? 0 : offset, maxLimit: maxLimitCandidate });
 }
 
 function safeLimitOffset(input, options) {
@@ -629,6 +668,7 @@ function normalizeSchemaTableSpec(tableName, tableSpec) {
   if (!Array.isArray(columnsInput) || columnsInput.length === 0) {
     fail(CODE.INVALID_SCHEMA, 'schema table ' + tableName + ' must declare at least one column');
   }
+  assertDenseArray(columnsInput, 'schema table ' + tableName + ' columns', CODE.INVALID_SCHEMA);
   const columns = [];
   const columnSet = new Set();
   for (const column of columnsInput) {
@@ -646,6 +686,7 @@ function normalizeSchemaTableSpec(tableName, tableSpec) {
     if (!Array.isArray(sortableInput)) {
       fail(CODE.INVALID_SCHEMA, 'schema table ' + tableName + ' sortable must be an array');
     }
+    assertDenseArray(sortableInput, 'schema table ' + tableName + ' sortable', CODE.INVALID_SCHEMA);
     sortable = [];
     const sortableSet = new Set();
     for (const column of sortableInput) {
@@ -669,7 +710,7 @@ function normalizeSchemaTableSpec(tableName, tableSpec) {
 function createSchemaGuard(schemaSpec, options) {
   if (options === undefined || options === null) options = {};
   assertPlainObject(options, 'schema guard options');
-  const dialect = normalizeDialect(options.dialect);
+  const dialect = normalizeDialect(ownOption(options, 'dialect'));
   if (!isPlainObject(schemaSpec)) {
     fail(CODE.INVALID_SCHEMA, 'schemaSpec must be a plain object mapping tables to columns');
   }
@@ -677,13 +718,13 @@ function createSchemaGuard(schemaSpec, options) {
   if (tableNames.length === 0) {
     fail(CODE.INVALID_SCHEMA, 'schemaSpec must declare at least one table');
   }
-  const maxTables = positiveCap(options.maxTables, MAX_SCHEMA_TABLES, 4_096, 'maxTables');
+  const maxTables = positiveCap(ownOption(options, 'maxTables'), MAX_SCHEMA_TABLES, 4_096, 'maxTables');
   if (tableNames.length > maxTables) {
     fail(CODE.INVALID_SCHEMA, 'schema table count exceeds maxTables (' + maxTables + ')');
   }
-  const maxColumns = positiveCap(options.maxColumns, MAX_SCHEMA_COLUMNS, 1_024, 'maxColumns');
-  const maxClauses = positiveCap(options.maxClauses, MAX_ORDER_CLAUSES, 64, 'maxClauses');
-  const configuredMaxLimit = optionalPositiveCap(options.maxLimit, Number.MAX_SAFE_INTEGER, 'maxLimit');
+  const maxColumns = positiveCap(ownOption(options, 'maxColumns'), MAX_SCHEMA_COLUMNS, 1_024, 'maxColumns');
+  const maxClauses = positiveCap(ownOption(options, 'maxClauses'), MAX_ORDER_CLAUSES, 64, 'maxClauses');
+  const configuredMaxLimit = optionalPositiveCap(ownOption(options, 'maxLimit'), Number.MAX_SAFE_INTEGER, 'maxLimit');
   const normalized = Object.create(null);
   for (const tableName of tableNames) {
     assertIdentifier(tableName, 'schema table');
@@ -773,6 +814,7 @@ function sqlJoin(parts, separator) {
   if (!Array.isArray(parts)) {
     fail(CODE.INVALID_INPUT, 'sqlJoin parts must be an array of SQL fragments');
   }
+  assertDenseArray(parts, 'sqlJoin parts', CODE.INVALID_INPUT);
   const joiner = validateJoinSeparator(separator === undefined ? ', ' : separator);
   for (const part of parts) assertFragment(part, 'sqlJoin part');
   if (parts.length === 0) return staticFragment('');
@@ -788,6 +830,7 @@ function wrapConditions(parts, joiner) {
   if (!Array.isArray(parts) || parts.length === 0) {
     fail(CODE.EMPTY_CONDITION_LIST, 'condition list must not be empty');
   }
+  assertDenseArray(parts, 'condition list', CODE.INVALID_INPUT);
   for (const part of parts) assertFragment(part, 'condition');
   return sqlJoin(parts.map((part) => assembleParts(['(', part, ')'])), joiner);
 }
@@ -818,11 +861,12 @@ function sqlIn(columnOrValues, valuesOrOptions, maybeOptions) {
   if (options === null || !isPlainObject(options)) {
     fail(CODE.INVALID_OPTIONS, 'sqlIn options must be a plain object');
   }
-  const onEmpty = options.onEmpty === undefined ? 'throw' : options.onEmpty;
+  const configuredOnEmpty = ownOption(options, 'onEmpty');
+  const onEmpty = configuredOnEmpty === undefined ? 'throw' : configuredOnEmpty;
   if (onEmpty !== 'throw' && onEmpty !== 'false') {
     fail(CODE.INVALID_OPTIONS, "sqlIn onEmpty must be 'throw' or 'false'");
   }
-  const dialect = normalizeDialect(options.dialect);
+  const dialect = normalizeDialect(ownOption(options, 'dialect'));
   let columnFragment;
   if (column !== undefined) {
     columnFragment = columnToFragment(column, dialect);
@@ -833,10 +877,11 @@ function sqlIn(columnOrValues, valuesOrOptions, maybeOptions) {
     }
     fail(CODE.EMPTY_IN_LIST, 'IN lists must not be empty');
   }
-  const maxParameters = positiveCap(options.maxParameters, DEFAULT_MAX_PARAMETERS, MAX_ALLOWED_PARAMETERS_CAP, 'maxParameters');
+  const maxParameters = positiveCap(ownOption(options, 'maxParameters'), DEFAULT_MAX_PARAMETERS, MAX_ALLOWED_PARAMETERS_CAP, 'maxParameters');
   if (values.length > maxParameters) {
     fail(CODE.MAX_PARAMETERS, 'IN list item count exceeds maxParameters (' + maxParameters + ')');
   }
+  assertDenseArray(values, 'sqlIn values', CODE.INVALID_INPUT);
   const parts = [];
   if (columnFragment !== undefined) {
     parts.push(columnFragment, ' IN (');
@@ -855,11 +900,12 @@ function normalizeValuesRows(rows, options) {
   if (!Array.isArray(rows) || rows.length === 0) {
     fail(CODE.EMPTY_VALUES, 'VALUES rows must be a non-empty array');
   }
-  const maxRows = positiveCap(options.maxRows, MAX_VALUES_ROWS, 10_000, 'maxRows');
+  const maxRows = positiveCap(ownOption(options, 'maxRows'), MAX_VALUES_ROWS, 10_000, 'maxRows');
   if (rows.length > maxRows) {
     fail(CODE.EMPTY_VALUES, 'VALUES row count exceeds maxRows (' + maxRows + ')');
   }
-  const maxParameters = positiveCap(options.maxParameters, DEFAULT_MAX_PARAMETERS, MAX_ALLOWED_PARAMETERS_CAP, 'maxParameters');
+  const maxParameters = positiveCap(ownOption(options, 'maxParameters'), DEFAULT_MAX_PARAMETERS, MAX_ALLOWED_PARAMETERS_CAP, 'maxParameters');
+  assertDenseArray(rows, 'VALUES rows', CODE.EMPTY_VALUES);
   const firstIsArray = Array.isArray(rows[0]);
   const firstIsObject = isPlainObject(rows[0]);
   if (!firstIsArray && !firstIsObject) {
@@ -868,22 +914,26 @@ function normalizeValuesRows(rows, options) {
   let columns;
   let width;
   if (firstIsArray) {
+    assertDenseArray(rows[0], 'VALUES row', CODE.EMPTY_VALUES);
     width = rows[0].length;
     if (width === 0) fail(CODE.EMPTY_VALUES, 'VALUES rows must not be empty');
     for (const row of rows) {
       if (!Array.isArray(row) || row.length !== width) {
         fail(CODE.EMPTY_VALUES, 'all VALUES array rows must have the same non-zero width');
       }
+      assertDenseArray(row, 'VALUES row', CODE.EMPTY_VALUES);
     }
     if (width * rows.length > maxParameters) {
       fail(CODE.MAX_PARAMETERS, 'VALUES parameter count exceeds maxParameters (' + maxParameters + ')');
     }
     return Object.freeze({ rows, columns: undefined, width });
   }
-  columns = options.columns === undefined ? Object.keys(rows[0]) : options.columns;
+  const configuredColumns = ownOption(options, 'columns');
+  columns = configuredColumns === undefined ? Object.keys(rows[0]) : configuredColumns;
   if (!Array.isArray(columns) || columns.length === 0) {
     fail(CODE.EMPTY_VALUES, 'VALUES object rows must have at least one column');
   }
+  assertDenseArray(columns, 'VALUES columns', CODE.EMPTY_VALUES);
   const seenColumns = new Set();
   for (const column of columns) {
     assertIdentifier(column, 'VALUES column');
@@ -897,6 +947,7 @@ function normalizeValuesRows(rows, options) {
     if (!isPlainObject(row)) {
       fail(CODE.EMPTY_VALUES, 'all VALUES object rows must be plain objects');
     }
+    assertNoInheritedEnumerableKeys(row, 'VALUES object row', CODE.EMPTY_VALUES);
     const keys = Object.keys(row);
     if (keys.length !== columns.length) {
       fail(CODE.EMPTY_VALUES, 'all VALUES object rows must exactly match the column list');
@@ -934,17 +985,19 @@ function sqlSet(assignments, options) {
   if (!isPlainObject(assignments)) {
     fail(CODE.EMPTY_SET, 'sqlSet assignments must be a plain object');
   }
-  const dialect = normalizeDialect(options.dialect);
+  const dialect = normalizeDialect(ownOption(options, 'dialect'));
+  assertNoInheritedEnumerableKeys(assignments, 'sqlSet assignments', CODE.EMPTY_SET);
   const keys = Object.keys(assignments);
   if (keys.length === 0) {
     fail(CODE.EMPTY_SET, 'sqlSet assignments must not be empty');
   }
-  const maxColumns = positiveCap(options.maxColumns, MAX_SET_COLUMNS, 1_024, 'maxColumns');
+  const maxColumns = positiveCap(ownOption(options, 'maxColumns'), MAX_SET_COLUMNS, 1_024, 'maxColumns');
   if (keys.length > maxColumns) {
     fail(CODE.EMPTY_SET, 'sqlSet column count exceeds maxColumns (' + maxColumns + ')');
   }
   let allowed;
-  if (options.allowedColumns !== undefined) allowed = normalizeAllowedColumns(options.allowedColumns);
+  const allowedColumnsOption = ownOption(options, 'allowedColumns');
+  if (allowedColumnsOption !== undefined) allowed = normalizeAllowedColumns(allowedColumnsOption);
   const parts = ['SET '];
   for (let index = 0; index < keys.length; index += 1) {
     const column = keys[index];
@@ -992,27 +1045,31 @@ function columnToFragment(column, dialect) {
 function sqlLike(column, value, options) {
   if (options === undefined || options === null) options = {};
   assertPlainObject(options, 'sqlLike options');
-  const dialect = normalizeDialect(options.dialect);
-  const mode = options.mode === undefined ? 'contains' : options.mode;
+  const dialect = normalizeDialect(ownOption(options, 'dialect'));
+  const configuredMode = ownOption(options, 'mode');
+  const mode = configuredMode === undefined ? 'contains' : configuredMode;
   if (mode !== 'contains' && mode !== 'startsWith' && mode !== 'endsWith') {
     fail(CODE.INVALID_LIKE_PATTERN, 'sqlLike mode must be contains, startsWith, or endsWith');
   }
   if (typeof value !== 'string') {
     fail(CODE.INVALID_LIKE_PATTERN, 'sqlLike value must be a string');
   }
-  const maxPatternLength = positiveCap(options.maxPatternLength, 1_024, 65_536, 'maxPatternLength');
+  const maxPatternLength = positiveCap(ownOption(options, 'maxPatternLength'), 1_024, 65_536, 'maxPatternLength');
   if (value.length > maxPatternLength) {
     fail(CODE.INVALID_LIKE_PATTERN, 'sqlLike value exceeds maxPatternLength (' + maxPatternLength + ')');
   }
-  const escapeChar = options.escapeChar === undefined ? '\\' : options.escapeChar;
+  const configuredEscapeChar = ownOption(options, 'escapeChar');
+  const escapeChar = configuredEscapeChar === undefined ? (dialect === 'mysql' ? '!' : '\\') : configuredEscapeChar;
+  if (dialect === 'mysql' && escapeChar === '\\') {
+    fail(CODE.INVALID_LIKE_PATTERN, 'MySQL LIKE escape characters must be mode-independent; use a non-backslash escape character');
+  }
   const escaped = escapeLikePattern(value, escapeChar);
   let pattern = escaped.pattern;
   if (mode === 'contains') pattern = '%' + pattern + '%';
   if (mode === 'startsWith') pattern = pattern + '%';
   if (mode === 'endsWith') pattern = '%' + pattern;
   const columnFragment = columnToFragment(column, dialect);
-  const escapeLiteral = dialect === 'mysql' && escaped.escapeChar === '\\' ? '\\\\' : escaped.escapeChar;
-  return assembleParts([columnFragment, ' LIKE ', dynamicPart(pattern), " ESCAPE '" + escapeLiteral + "'"]);
+  return assembleParts([columnFragment, ' LIKE ', dynamicPart(pattern), " ESCAPE '" + escaped.escapeChar + "'"]);
 }
 
 function utf8Length(text) {
@@ -1040,6 +1097,12 @@ function isAsciiWhitespace(character) {
   return character === ' ' || character === '\t' || character === '\n' || character === '\r' || character === '\f' || character === '\v';
 }
 
+function isMysqlDashCommentStart(character) {
+  if (character === undefined) return true;
+  const code = character.charCodeAt(0);
+  return isAsciiWhitespace(character) || code < 32 || code === 127;
+}
+
 function isWordCharacter(character) {
   return (
     (character >= 'a' && character <= 'z') ||
@@ -1065,8 +1128,8 @@ function auditSqlQuery(query, options) {
   }
   if (options === undefined || options === null) options = {};
   assertPlainObject(options, 'audit options');
-  const dialect = normalizeDialect(options.dialect);
-  const maxSqlLength = positiveCap(options.maxSqlLength, DEFAULT_MAX_SQL_LENGTH, MAX_ALLOWED_SQL_LENGTH_CAP, 'maxSqlLength');
+  const dialect = normalizeDialect(ownOption(options, 'dialect'));
+  const maxSqlLength = positiveCap(ownOption(options, 'maxSqlLength'), DEFAULT_MAX_SQL_LENGTH, MAX_ALLOWED_SQL_LENGTH_CAP, 'maxSqlLength');
   const stats = {
     length: query.length,
     bytes: utf8Length(query),
@@ -1108,6 +1171,7 @@ function auditSqlQuery(query, options) {
   let state = 'normal';
   let quoteStart = -1;
   let quoteKind = '';
+  let quoteBackslashEscapes = false;
   let dollarDelimiter = '';
   let blockCommentDepth = 0;
   let blockCommentStart = -1;
@@ -1118,6 +1182,11 @@ function auditSqlQuery(query, options) {
   let semicolonSeen = false;
   let contentAfterSemicolonIndex = -1;
   const tokens = [];
+
+  function hasAdjacentPostgresEscapePrefix(position) {
+    const previous = tokens[tokens.length - 1];
+    return previous !== undefined && previous.index === position - 1 && (previous.word === 'E' || previous.word === 'e');
+  }
 
   function markStatementContent(position) {
     if (!statementHasContent) {
@@ -1140,7 +1209,7 @@ function auditSqlQuery(query, options) {
     const character = query[index];
     if (state === 'single' || state === 'double' || state === 'backtick') {
       const quote = state === 'single' ? "'" : (state === 'double' ? '"' : '`');
-      if (dialect === 'mysql' && character === '\\') {
+      if (quoteBackslashEscapes && character === '\\') {
         index += 2;
         continue;
       }
@@ -1150,6 +1219,7 @@ function auditSqlQuery(query, options) {
           continue;
         }
         state = 'normal';
+        quoteBackslashEscapes = false;
         index += 1;
         continue;
       }
@@ -1176,7 +1246,7 @@ function auditSqlQuery(query, options) {
 
     if (state === 'block-comment') {
       if (character === '/' && query[index + 1] === '*') {
-        blockCommentDepth += 1;
+        if (dialect === 'postgres') blockCommentDepth += 1;
         index += 2;
         continue;
       }
@@ -1195,7 +1265,7 @@ function auditSqlQuery(query, options) {
       continue;
     }
 
-    if (character === '-' && query[index + 1] === '-') {
+    if (character === '-' && query[index + 1] === '-' && (dialect !== 'mysql' || isMysqlDashCommentStart(query[index + 2]))) {
       stats.comments += 1;
       addFinding(CODE.COMMENT_TOKEN, 'SQL comment marker -- appears outside a string literal', index, '--');
       state = 'line-comment';
@@ -1204,6 +1274,11 @@ function auditSqlQuery(query, options) {
     }
     if (character === '/' && query[index + 1] === '*') {
       stats.comments += 1;
+      if (dialect === 'mysql' && query[index + 2] === '!') {
+        addFinding(CODE.COMMENT_TOKEN, 'MySQL executable comment marker /*! appears outside a string literal', index, '/*!');
+        index += 3;
+        continue;
+      }
       addFinding(CODE.COMMENT_TOKEN, 'SQL block comment marker /* appears outside a string literal', index, '/*');
       state = 'block-comment';
       blockCommentDepth = 1;
@@ -1233,6 +1308,11 @@ function auditSqlQuery(query, options) {
       state = character === "'" ? 'single' : (character === '"' ? 'double' : 'backtick');
       quoteStart = index;
       quoteKind = character;
+      quoteBackslashEscapes = dialect === 'mysql' || (
+        dialect === 'postgres' &&
+        character === "'" &&
+        hasAdjacentPostgresEscapePrefix(index)
+      );
       index += 1;
       continue;
     }

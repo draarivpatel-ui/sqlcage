@@ -301,9 +301,7 @@ test('sqlLike supports schema guard column fragments', () => {
 
 test('sqlLike quotes a string column per dialect', () => {
   const mysqlSql = my(sql`${sqlLike('name', 'x', { dialect: 'mysql' })}`).sql;
-  assert.equal(mysqlSql.startsWith('`name` LIKE ? ESCAPE'), true);
-  assert.equal(mysqlSql.endsWith("'"), true);
-  assert.equal(mysqlSql.slice(mysqlSql.indexOf("ESCAPE '") + 8, -1), '\\\\');
+  assert.equal(mysqlSql, '`name` LIKE ? ESCAPE \'!\'');
   assert.equal(lite(sql`${sqlLike('name', 'x', { dialect: 'sqlite' })}`).sql, '"name" LIKE ? ESCAPE \'\\\'');
 });
 
