@@ -14,7 +14,7 @@ Until the package is published, use the repository revision itself as the unit o
 
 Do not open a public issue with a working exploit, proof-of-concept payload, or unpatched bypass.
 
-Use the private vulnerability reporting mechanism on the repository's GitHub Security tab when available. If private reporting is not enabled yet, open a minimal public issue that asks for a private contact path and do not include the payload.
+Use the repository's [GitHub Security Advisory form](https://github.com/draarivpatel-ui/sqlcage/security/advisories/new). Do not open a public issue with the payload.
 
 Include these details when safe to share privately:
 
@@ -42,6 +42,13 @@ Out of scope:
 - Driver behavior after a correctly parameterized query has left sqlcage.
 - The fact that the lexical auditor cannot prove arbitrary SQL safe.
 - Attacks requiring the attacker to execute arbitrary JavaScript in the application process.
+
+## Disclosure timeline
+
+- Acknowledgment: within 48 hours.
+- Initial assessment: within 7 calendar days.
+- Fix or mitigation plan: within 30 calendar days for confirmed high-impact reports.
+- Coordinated public disclosure: up to 90 days by default, adjusted by mutual agreement when exploitation or user risk requires a different date.
 
 ## Hardening posture
 

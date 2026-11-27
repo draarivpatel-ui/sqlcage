@@ -1,6 +1,6 @@
 # Good first issues
 
-These ten starter specifications are designed for new contributors. Each one should include tests and should preserve zero dependencies.
+These ten starter specifications are designed for new contributors. Each one should include tests and should preserve zero runtime dependencies.
 
 ## 1. Audit byte length fuzz corpus
 
@@ -28,7 +28,7 @@ Create a small `fixtures/audit/` corpus of clean and risky SQL files, then test 
 
 ## 7. TypeScript consumer smoke fixture
 
-Add a dependency-free structural test that reads `types/index.d.ts` and verifies overload names and return interfaces remain present. Do not add TypeScript as a dependency unless maintainers explicitly change the zero-dependency policy.
+Add a dependency-free structural test that reads `types/index.d.ts` and verifies overload names and return interfaces remain present. Do not add TypeScript as a dependency unless maintainers explicitly change the zero-runtime-dependency policy.
 
 ## 8. Values row shape documentation
 

@@ -112,9 +112,12 @@ test('package name, version, license, and engine contract are exact', () => {
   assert.equal(packageJson.engines.node, '>=18.0.0');
 });
 
-test('package has zero runtime and development dependencies', () => {
+test('package has zero runtime dependencies and confines fuzzing to development use', () => {
   assert.deepEqual(packageJson.dependencies, {});
-  assert.deepEqual(packageJson.devDependencies, {});
+  assert.deepEqual(Object.keys(packageJson.devDependencies), ['fast-check']);
+  assert.equal(typeof packageJson.devDependencies['fast-check'], 'string');
+  assert.equal(packageJson.devDependencies['fast-check'].startsWith('^'), false);
+  assert.equal(packageJson.devDependencies['fast-check'].startsWith('~'), false);
 });
 
 test('package export map points at source ESM, built CJS, and types', () => {
